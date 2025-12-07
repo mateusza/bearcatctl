@@ -50,13 +50,13 @@ class Port():
 class ChannelInfo():
     ch: int
     freq: float # MHz
-    mod: str
-    dly: bool
-    lo: bool
-    prio: bool
+    mod: str = ""
+    dly: bool = False
+    lo: bool = False
+    prio: bool = False
 
     @classmethod
-    def from_cmd(cls, resp):
+    def from_cmd(cls, resp: list[str]):
         #['CIN', '295', '', '00000000', 'FM', '', '0', '1', '0']
         _, channel, _, freq10, modulation, _, delay, lockout, priority = resp
 
@@ -67,7 +67,8 @@ class ChannelInfo():
                    lo=bool(int(lockout)),
                    prio=bool(int(priority)))
 
-    def as_cmd(self):
+    @property
+    def as_cmd(self) -> list[str]:
         def boolchar(b):
             return '1' if b else '0'
         return ["CIN",
@@ -104,6 +105,10 @@ class UnidenBearcat():
         self.query("EPG")
         self._is_prog = False
 
+    def clear_all(self):
+        self.ensure_program_mode()
+        self.cmd('CLR')
+
     def get_model(self):
         raw = self.cmd('MDL')
         return raw[1]
@@ -120,7 +125,11 @@ class UnidenBearcat():
     def get_channel(self, channel_id: int):
         self.ensure_program_mode()
         raw = self.cmd('CIN', f"{channel_id}")
-        return raw
+        return ChannelInfo.from_cmd(raw)
+
+    def set_channel(self, channel: ChannelInfo):
+        self.ensure_program_mode()
+        self.cmd(*channel.as_cmd)
 
     def self_check_model(self):
         model = self.get_model()
@@ -156,14 +165,15 @@ def list_ports():
             if x.vid is not None
             and f"{x.vid:x}:{x.pid:x}" in DEVICE_IDS]
 
-def open_port():
-    ...
+
+def get_scanner():
+    portname = list_ports()[0]
+    return UnidenBearcat.from_port(portname)
 
 def main():
     cmd_list_ports()
-    portname = list_ports()[0]
 
-    ub = UnidenBearcat.from_port(portname)
+    ub = get_scanner()
     ub.self_check_model()
 
     ub.list_channels()
