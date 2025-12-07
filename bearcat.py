@@ -9,6 +9,8 @@ import serial
 import serial.tools
 import serial.tools.list_ports
 
+DEFAULT_TIMEOUT = 3
+
 DEVICE_IDS = [
               "10c4:ea60", # Silicon Labs CP210x UART Bridge
              ]
@@ -31,7 +33,7 @@ class Port():
     def __init__(self, portname: str):
         baudrate = 57600
         self._serial = serial.Serial(portname, baudrate=baudrate)
-        self._serial.timeout = 3
+        self.set_timeout(DEFAULT_TIMEOUT)
 
     def send(self, command: str):
         logging.info(f"> {command}")
@@ -45,6 +47,12 @@ class Port():
     def query(self, command: str = ''):
         self.send(command)
         return self.recv()
+
+    def set_timeout(self, secs: int):
+        self._serial.timeout = secs
+
+    def get_timeout(self) -> int:
+        return self._serial.timeout
 
 @dataclass
 class ChannelInfo():
@@ -107,7 +115,12 @@ class UnidenBearcat():
 
     def clear_all(self):
         self.ensure_program_mode()
+        t = self._port.get_timeout()
+        # tepmorarily incrementing timeout
+        # because CLR takes a long time
+        self._port.set_timeout(60)
         self.cmd('CLR')
+        self._port.set_timeout(t)
 
     def get_model(self):
         raw = self.cmd('MDL')
